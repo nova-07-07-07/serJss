@@ -33,39 +33,6 @@ USER_FILE = os.path.join(BASE_DIR, 'user.json')
 ORDER_FILE = os.path.join(BASE_DIR, 'order.json')
 LINES_FILE = os.path.join(BASE_DIR, 'lines.json')
 
-# FIRST define helpers
-
-def _ensure_dir(filepath):
-    folder = os.path.dirname(filepath)
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-
-def _write_json(filepath, data):
-    _ensure_dir(filepath)
-    with open(filepath, 'w') as f:
-        json.dump(data, f, indent=4)
-
-def _read_json(filepath):
-    if not os.path.exists(filepath):
-        return []
-    try:
-        with open(filepath, 'r') as f:
-            data = json.load(f)
-            return data if isinstance(data, list) else []
-    except:
-        return []
-
-# THEN init
-
-def init_files():
-    for file in [USER_FILE, ORDER_FILE, LINES_FILE]:
-        if not os.path.exists(file):
-            _write_json(file, [])
-
-init_files()
-
-
-
 db_lock = Lock()
 
 def _ensure_dir(filepath):
@@ -84,7 +51,17 @@ def _read_json(filepath):
     except:
         return []
 
+def _write_json(filepath, data):
+    _ensure_dir(filepath)
+    with open(filepath, 'w') as f:
+        json.dump(data, f, indent=4)
 
+def init_files():
+    for file in [USER_FILE, ORDER_FILE, LINES_FILE]:
+        if not os.path.exists(file):
+            _write_json(file, [])
+
+init_files()
 
 def _get_next_id(data_list):
     """Calculates the next ID based on the maximum ID in the list."""
@@ -135,10 +112,6 @@ def create_order_record(user_id, items, created_at, location=None):
         
         order_id = _get_next_id(orders)
         
-        # Create the Order Header
-
-
-
         order = {
             "id": order_id,
             "user_id": user_id,
@@ -150,28 +123,18 @@ def create_order_record(user_id, items, created_at, location=None):
             "paid_amount": 0
         }
 
-
         # get data from config.json file
-        # {
-        #     "items": [
-        #         {"id": "300ml", "name": "300ml Bottle", "available": true, "price": 100},
-        #         {"id": "500ml", "name": "500ml Bottle", "available": true, "price": 150},
-        #         {"id": "1l", "name": "1L Bottle", "available": true, "price": 250},
-        #         {"id": "2l", "name": "2L Bottle", "available": true, "price": 400},
-        #         {"id": "20l", "name": "20L Jar", "available": true, "price": 40}
-        #     ]
-        # }
-
         config_data = None
-        with open('config.json', 'r') as f:
-            config_data = json.load(f)
-
+        try:
+            with open('config.json', 'r') as f:
+                config_data = json.load(f)
+        except:
+            config_data = {"items": []} # fallback
 
         # Calculate total amount
-
         total_amount = 0
         for item in items:
-            for i in config_data["items"]:
+            for i in config_data.get("items", []):
                 if i["id"] == item["id"]:
                     total_amount += i["price"] * item["quantity"]
                     break
@@ -182,7 +145,6 @@ def create_order_record(user_id, items, created_at, location=None):
         
         orders.append(order)
         _write_json(ORDER_FILE, orders)
-
         
         # Return order with items for frontend consistency
         order["items"] = items
@@ -196,10 +158,10 @@ def cancel_order_record(order_id):
         orders = [o for o in orders if o.get("id") != order_id]
         
         if len(orders) < original_len:
+            _write_json(ORDER_FILE, orders)
             return True
         return False
     
-
 def update_order_items(order_id, items):
     with db_lock:
         orders = _read_json(ORDER_FILE)
@@ -207,7 +169,6 @@ def update_order_items(order_id, items):
             if order['id'] == order_id:
                 # Update items directly in order
                 order['items'] = [{"item_id": item['id'], "quantity": item['quantity']} for item in items]
-                # Note: This does not update the total amount, keeping behavior consistent with previous version
                 _write_json(ORDER_FILE, orders)
                 return True
         return False
@@ -217,13 +178,13 @@ def update_user_profile_pic(user_id, pic_path):
         users = _read_json(USER_FILE)
         for user in users:
             if user["id"] == user_id:
-                user["profile_pic"] = []
+                if not isinstance(user.get("profile_pic"), list):
+                    user["profile_pic"] = []
                 user["profile_pic"].append(pic_path)
                 _write_json(USER_FILE, users)
                 return True
         return False
     
-
 def add_user_ref_img(user_id, pic_path):
     with db_lock:
         users = _read_json(USER_FILE)
@@ -262,21 +223,15 @@ def update_user_location(user_id, lat, lng):
                 user["lng"] = lng
 
                 try:
-                    
                     url = f"https://api.geoapify.com/v1/geocode/reverse?lat={lat}&lon={lng}&apiKey=e4865a6fb15c412b9260343686aa7100"
-                    
                     res = requests.get(url, timeout=5)
-
                     data = res.json()
-
                     features = data.get("features", [])
 
                     if len(features) > 0:
                         address = features[0].get("properties", {}).get("formatted")
                     else:
                         address = None
-
-
                 except:
                     address = None
                 user["address"] = address
@@ -285,7 +240,6 @@ def update_user_location(user_id, lat, lng):
                 return True
 
         return False
-
 
 def update_order_location(order_id, location):
     with db_lock:
@@ -304,7 +258,7 @@ def get_user_orders(user_id):
         # Filter orders for the specific user
         user_orders = [o for o in orders if o.get("user_id") == user_id]
         
-        # Reconstruct items for each order from lines.json
+        # Reconstruct items for each order
         for order in user_orders:
             if "items" in order:
                 order["items"] = [{"id": i.get("item_id"), "quantity": i.get("quantity")} for i in order["items"]]
@@ -314,5 +268,3 @@ def get_user_orders(user_id):
         # Sort by created_at descending
         user_orders.sort(key=lambda x: x["created_at"], reverse=True)
         return user_orders
-    
-
