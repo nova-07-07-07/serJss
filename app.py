@@ -1,7 +1,7 @@
 import os, time
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from utils.auth import create_token, verify_token, create_otp, verify_otp
-from utils.json_db import get_user_by_mobile, create_user_record, create_order_record, get_user_orders, cancel_order_record, update_user_profile_pic, update_user_location, add_user_ref_img, delete_user_ref_img, update_order_items, update_order_location
+from json_db import get_user_by_mobile, create_user_record, create_order_record, get_user_orders, cancel_order_record, update_user_profile_pic, update_user_location, add_user_ref_img, delete_user_ref_img, update_order_items, update_order_location
 from werkzeug.utils import secure_filename
 # from datetime import datetime # No longer needed for parsing
 
