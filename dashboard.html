@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - JSS Water</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --bg-main: #07131f;
+            --bg-card: #0d1e2c;
+            --primary: #13bfff;
+            --primary-2: #1c7dff;
+            --secondary: #0bb7a7;
+            --secondary-2: #14d7c8;
+            --cyan: #67dfff;
+            --white: #ffffff;
+            --text-soft: #9db1c1;
+            --border: rgba(85, 170, 220, 0.12);
+            --danger: #dc3545;
+        }
+
+        body { font-family: Inter, sans-serif; background: var(--bg-main); color: var(--white); margin: 0; padding: 0; padding-top: 70px; }
+
+        /* Navbar Styles */
+        .navbar { position: fixed; top: 0; left: 0; width: 100%; background: rgba(7, 19, 31, 0.95); border-bottom: 1px solid var(--border); color: var(--white); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; box-sizing: border-box; height: 60px; z-index: 1000; backdrop-filter: blur(10px); }
+        .nav-brand { font-size: 1.2rem; font-weight: bold; cursor: pointer; color: var(--primary); }
+        .nav-items { display: flex; align-items: center; gap: 20px; }
+        .nav-item { cursor: pointer; font-size: 1rem; color: var(--text-soft); transition: 0.3s; }
+        .nav-item:hover { color: var(--cyan); }
+        .nav-profile-img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); cursor: pointer; }
+
+        /* Layout & Cards */
+        .container { max-width: 800px; margin: 0 auto; padding: 10px; }
+        .view-section { display: none; } /* Hidden by default */
+        .view-section.active { display: block; }
+
+        .card { background: var(--bg-card); padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-bottom: 20px; border: 1px solid var(--border); color: var(--white); }
+        
+        .profile { text-align: center; margin-bottom: 20px; }
+        .profile img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary); box-shadow: 0 0 15px rgba(19, 191, 255, 0.3); }
+        .profile input[type="file"] { display: block; margin: 10px auto; color: var(--text-soft); }
+        .profile button { background: var(--primary); font-size: 0.8rem; padding: 5px 10px; width: auto; color: white; border: none; border-radius: 4px; }
+
+        h2, h3, h4 { color: var(--white); margin-top: 0; }
+        p, label { color: var(--text-soft); }
+        
+        .big-btn { 
+            display: block; width: 100%; padding: 15px; font-size: 1.2rem; color: white; 
+            background: linear-gradient(90deg, var(--primary), var(--primary-2)); 
+            border: none; border-radius: 12px; cursor: pointer; transition: 0.3s;
+            box-shadow: 0 5px 15px rgba(19, 191, 255, 0.2);
+        }
+        .big-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(19, 191, 255, 0.3); }
+        .big-btn.disabled { background: #333; color: #666; cursor: not-allowed; transform: none; box-shadow: none; }
+        
+        .order-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .order-item input { width: 70px; text-align: center; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: var(--white); padding: 5px; border-radius: 5px; }
+        .total-price { text-align: right; font-size: 1.2rem; font-weight: bold; margin-top: 15px; color: var(--secondary-2); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border-bottom: 1px solid var(--border); padding: 12px; text-align: left; color: var(--text-soft); }
+        th { background-color: rgba(255,255,255,0.05); color: var(--cyan); }
+        .cancel-btn { background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+
+        /* Map & Modal Styles */
+        #map { height: 300px; width: 100%; border-radius: 12px; margin-top: 10px; z-index: 1; border: 1px solid var(--border); }
+        .gps-btn { margin-top: 10px; background: linear-gradient(90deg, var(--secondary), var(--secondary-2)); width: auto; font-size: 0.9rem; padding: 8px 15px; }
+        
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 9999; backdrop-filter: blur(5px); }
+        .modal-content { background: var(--bg-card); padding: 25px; border-radius: 16px; text-align: center; max-width: 350px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.4); border: 1px solid var(--border); color: var(--white); }
+        .modal-btn { margin-top: 15px; padding: 10px 24px; background: linear-gradient(90deg, var(--primary), var(--primary-2)); color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .hidden { display: none !important; }
+
+        /* Reference Image Grid */
+        .ref-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
+        .ref-item { position: relative; width: 100%; padding-top: 100%; }
+        .ref-item img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+        .del-ref-btn { 
+            position: absolute; top: -8px; right: -8px;
+            background: var(--danger); color: white; border: none; border-radius: 50%; 
+            width: 24px; height: 24px; font-size: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .ref-section { margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; }
+        .ref-section h4 { margin-bottom: 10px; font-size: 1rem; color: var(--cyan); }
+        .ref-controls { display: flex; gap: 5px; align-items: center; margin-top: 10px; justify-content: center;}
+        
+        /* Auth Styles */
+        .auth-container { max-width: 400px; margin: 100px auto; text-align: center; }
+        .auth-input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; background: rgba(0,0,0,0.2); color: var(--white); }
+        
+        /* Map Modal */
+        #order-location-modal { z-index: 10001; }
+        #order-location-modal .modal-content { max-width: 700px; width: 95%; text-align: left; }
+        #order-location-map { height: 400px; width: 100%; border-radius: 10px; margin-top: 10px; border: 1px solid var(--border); }
+        
+        .modal:not(.hidden) { display: flex; }
+        .map-mode-bar{ display:flex; gap:8px; margin-top:10px; margin-bottom:10px; flex-wrap:wrap; }
+
+        .map-mode-btn { border: 1px solid var(--border); padding: 8px 14px; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.05); color: var(--text-soft); font-size: 0.9rem; }
+        .map-mode-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .order-detail-td{background-color: rgba(7, 19, 31, 0.95);}
+        .order-detail-td:hover{background-color: rgba(14, 37, 61, 0.95);}
+    </style>
+</head>
+
+<body>
+
+<!-- Navigation Bar (Hidden on Login) -->
+<div id="navbar" class="navbar hidden">
+    <div class="nav-brand" onclick="switchView('home')">JSS Service</div>
+    <div class="nav-items">
+        <div class="nav-item" onclick="switchView('home')">Home</div>
+        <div class="nav-item" onclick="switchView('history')">Cart</div>
+        <img id="nav-profile-pic" class="nav-profile-img" src="" onclick="switchView('profile')">
+    </div>
+</div>
+
+<!-- Login / Signup Section -->
+<div id="auth-section" class="container auth-container hidden">
+    <div class="card">
+        <h2>JSS Water Service</h2>
+        <div id="auth-step-1">
+            <p>Enter your mobile number to continue</p>
+            <input type="text" id="auth-name" class="auth-input" placeholder="Full Name (New Users Only)">
+            <input type="tel" id="auth-mobile" class="auth-input" placeholder="Mobile Number">
+            <button class="big-btn" onclick="requestOtp()">Get OTP</button>
+        </div>
+        <div id="auth-step-2" class="hidden">
+            <p>Enter the OTP sent to your mobile</p>
+            <input type="text" id="auth-otp" class="auth-input" placeholder="OTP">
+            <button class="big-btn" onclick="verifyAndLogin()">Login</button>
+        </div>
+        <p id="auth-error" style="color: red; margin-top: 10px;"></p>
+    </div>
+</div>
+
+<!-- Main App Container -->
+<div id="app-container" class="container hidden">
+    
+    <!-- HOME VIEW -->
+    <div id="home-view" class="view-section">
+        <div class="card">
+            <h3>Quick Order</h3>
+            <button id="quick-order-btn" class="big-btn">Order Water (1 Load - 20L Jar)</button>
+            <p id="quick-order-status" style="text-align: center; color: #666; margin-top: 10px;"></p>
+        </div>
+
+        <div class="card">
+            <h3>Place a New Order</h3>
+            <div id="order-form">
+                <!-- Items injected via JS -->
+            </div>
+            <div class="total-price" id="total-price-display">Total: ₹0</div>
+            <button id="order-btn" class="big-btn" onclick="placeOrder()" style="margin-top: 20px;">Place Order</button>
+            <p id="status-msg" style="text-align: center; color: #666; margin-top: 10px;"></p>
+        </div>
+    </div>
+
+    <!-- PROFILE VIEW -->
+    <div id="profile-view" class="view-section">
+        <div class="card">
+            <div class="profile">
+                <img id="profile-img" onclick="uploadProfilePic()" src="https://imgs.search.brave.com/RDlr00DIZWKKhPu4ymE1K_IzmblJm8CbiuCSzm-xnQ4/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly90NC5m/dGNkbi5uZXQvanBn/LzAxLzA3LzQzLzQ1/LzM2MF9GXzEwNzQz/NDUxMV9pYXJGMno4/OGM2RHM2QWxndHdv/dEhTQWt0V0NkWU9u/Ny5qcGc" alt="Profile Picture">
+                <h2 id="user-name">User</h2>
+                <p id="user-pcp"></p>
+                <p id="addEle">Address</p>
+                <input type="file" style="display: none;" id="profile-pic-input" accept="image/*">
+                
+                <div class="ref-section">
+                    <h4>Reference Images (Max 6)</h4>
+                    <div id="ref-grid" class="ref-grid"></div>
+                    <div class="ref-controls" id="ref-upload-container">
+                        <input type="file" id="ref-img-input" accept="image/*" style="width: auto; margin: 0;display: none;">
+                        <button onclick="uploadRefImg()" style="width: auto;">Upload Ref</button>
+                    </div>
+                </div>
+                <div style="width: 100%; display: flex; justify-content: center; align-items: center;">
+                    <button class="big-btn" style="background: #dc3545; margin-top: 20px;" onclick="logout()">Logout</button>
+                </div>
+                
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Delivery Location</h3>
+            <p id="loc-msg" style="font-size: 0.9rem; color: #666;">Click map to set location.</p>
+            <p style="font-size: 0.8rem;">Lat: <span id="lbl-lat">-</span>, Lng: <span id="lbl-lng">-</span></p>
+            <div class="map-mode-bar">
+                <button id="main-standard-btn" class="map-mode-btn active" onclick="setMainMapMode('standard')">Standard</button>
+                <button id="main-satellite-btn" class="map-mode-btn" onclick="setMainMapMode('satellite')">Satellite</button>
+            </div>
+            <div id="map"></div>
+            <button id="gps-btn" class="big-btn gps-btn" onclick="detectLocation()">📍 Use Current Location</button>
+            <button id="confirm-loc-btn" class="big-btn hidden" style="background: #28a745; margin-top: 10px;" onclick="confirmLocation()">✅ Confirm Location</button>
+        </div>
+    </div>
+
+    <!-- HISTORY VIEW (CART) -->
+    <div id="history-view" class="view-section">
+        <div class="card">
+            <h3>Order History</h3>
+            <table id="history-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Items</th>
+                        <th>Status</th>
+                        <th>Payment</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Rows injected by JS -->
+                </tbody>
+            </table>
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="tel:9384965235" style="
+                    display: inline-block;
+                    padding: 10px 20px;
+                    background-color: #007bff;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 50px;
+                    font-weight: bold;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                ">
+                    <span style="margin-right: 8px;">📞</span> Contact us to make changes
+                </a>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Custom Modal -->
+<div id="custom-modal" class="modal hidden">
+    <div class="modal-content">
+        <p id="modal-msg"></p>
+        <button class="modal-btn" onclick="closeModal()">OK</button>
+    </div>
+</div>
+
+<!-- Edit Order Modal -->
+<div id="edit-modal" class="modal hidden">
+    <div class="modal-content" style="max-width: 500px;">
+        <h3>Edit Order</h3>
+        <div id="edit-order-form">
+            <!-- Items injected via JS -->
+        </div>
+        <div style="margin-top: 15px;">
+            <button class="modal-btn" onclick="saveEditedOrder()" style="background: #28a745; margin-right: 10px;">Save Changes</button>
+            <button class="modal-btn" onclick="closeEditModal()" style="background: #6c757d;">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="order-location-modal" class="modal hidden">
+    <div class="modal-content" style="max-width: 700px; width: 95%;">
+        <h3>Update Order Location</h3>
+        <div id="order-location-changer"></div>
+        <div style="margin-top: 15px;">
+            <button class="modal-btn" onclick="closeOrderLocationModal()" style="background: #6c757d;">Close</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    let mainStandardLayer = null;
+    let mainSatelliteLayer = null;
+    let currentMainLayer = null;
+
+    let orderStandardLayer = null;
+    let orderSatelliteLayer = null;
+    let currentOrderLayer = null;
+
+    let mainMapMode = 'standard';
+    let orderMapMode = 'standard';
+    let user = null;
+    let map, marker;
+    let globalConfig = null; // Store config for edit modal
+    let currentEditingOrderId = null;
+    // Default CoordinatesLat: 11.607625419515495, Lng: 78.00374865526464
+    let currentLat = 11.607625419515495;
+    let currentLng = 78.00374865526464;
+    let tempLat = null, tempLng = null;
+
+    // --- Authentication & View Logic ---
+    function checkAuth() {
+        const storedSession = JSON.parse(localStorage.getItem('user'));
+        if (!storedSession || !storedSession.token) {
+            showAuth();
+        } else {
+            initDashboard(storedSession.token);
+        }
+    }
+
+    function showAuth() {
+        document.getElementById('navbar').classList.add('hidden');
+        document.getElementById('app-container').classList.add('hidden');
+        document.getElementById('auth-section').classList.remove('hidden');
+    }
+
+    async function initDashboard(token) {
+        document.getElementById('auth-section').classList.add('hidden');
+        
+        const res = await fetch('/user/me', {
+            headers: { 'Authorization': token }
+        });
+
+        if (!res.ok) {
+            logout();
+            return;
+        }
+
+        // Auth successful: Show App
+        document.getElementById('navbar').classList.remove('hidden');
+        document.getElementById('app-container').classList.remove('hidden');
+        switchView('home'); // Default view
+
+        user = await res.json();
+        
+        // Update global coordinates based on fetched user
+        currentLat = user.lat || 11.6643;
+        currentLng = user.lng || 78.1460;
+        
+        document.getElementById('lbl-lat').innerText = currentLat;
+        document.getElementById('lbl-lng').innerText = currentLng;
+
+        document.getElementById('user-name').innerText = user.name;
+        document.getElementById('user-pcp').innerText = 'can price : '+ user.pcp + '₹';
+        
+        // Check if address exists in user object, handle gracefully
+        if (user.address) document.getElementById('addEle').innerText = user.address;
+        
+        // Profile Pic handling
+        
+        const profilePicUrl = user.profile_pic
+        ? `${user.profile_pic}?t=${Date.now()}`
+        : "https://imgs.search.brave.com/RDlr00DIZWKKhPu4ymE1K_IzmblJm8CbiuCSzm-xnQ4/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly90NC5m/dGNkbi5uZXQvanBn/LzAxLzA3LzQzLzQ1/LzM2MF9GXzEwNzQz/NDUxMV9pYXJGMno4OGM2RHM2QWxndHdvZEhTQWt0V0NkWU9uNy5qcGc";
+
+        document.getElementById('profile-img').src = profilePicUrl;
+        document.getElementById('nav-profile-pic').src = profilePicUrl;
+        
+        renderRefImages();
+        loadOrderForm();
+        loadOrders();
+
+        // Attach event listener programmatically for robustness
+        const qBtn = document.getElementById('quick-order-btn');
+        if(qBtn) qBtn.addEventListener('click', placeQuickOrder);
+        
+        initMap();
+    }
+
+    function switchView(viewName) {
+        // Hide all views
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        
+        // Show selected view
+        const target = document.getElementById(viewName + '-view');
+        if (target) {
+            target.classList.add('active');
+            // Refresh map if entering profile view as Map doesn't render well when hidden
+            if (viewName === 'profile' && map) {
+                setTimeout(() => { map.invalidateSize(); }, 200);
+            }
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem('user');
+        location.reload(); // Simplest way to reset state
+    }
+
+    // --- Login Logic ---
+    async function requestOtp() {
+        const mobile = document.getElementById('auth-mobile').value;
+        if (!mobile) return showAuthError("Mobile required");
+        
+        const res = await fetch('/request-otp', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({mobile})
+        });
+        if (res.ok) {
+            document.getElementById('auth-step-1').classList.add('hidden');
+            document.getElementById('auth-step-2').classList.remove('hidden');
+            showAuthError("");
+        } else {
+            showAuthError("Failed to send OTP");
+        }
+    }
+
+    async function verifyAndLogin() {
+        const mobile = document.getElementById('auth-mobile').value;
+        const name = document.getElementById('auth-name').value;
+        const otp = document.getElementById('auth-otp').value;
+        
+        const res = await fetch('/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({mobile, otp, name})
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            localStorage.setItem('user', JSON.stringify(data));
+            initDashboard(data.token);
+        } else {
+            if(data.error === 'new_user_name_required') {
+                showAuthError("New user? Enter name in Step 1.");
+                document.getElementById('auth-step-1').classList.remove('hidden');
+                document.getElementById('auth-step-2').classList.add('hidden');
+            } else {
+                showAuthError(data.error || "Login Failed");
+            }
+        }
+    }
+    
+    function showAuthError(msg) {
+        document.getElementById('auth-error').innerText = msg;
+    }
+
+    function renderRefImages() {
+        const grid = document.getElementById('ref-grid');
+        grid.innerHTML = '';
+        
+        const refs = user.refrence_Img || [];
+        
+        // Hide upload if 6 or more
+        if (refs.length >= 6) {
+            document.getElementById('ref-upload-container').classList.add('hidden');
+        } else {
+            document.getElementById('ref-upload-container').classList.remove('hidden');
+        }
+         
+        
+        refs.forEach(img => {
+            const div = document.createElement('div');
+            div.className = 'ref-item';
+            div.innerHTML = `
+                <img src="${img}" onclick="window.open('${img}', '_blank')">
+                <button class="del-ref-btn" style="background: red;" onclick="deleteRefImg('${img}')">×</button>
+            `;
+            grid.appendChild(div);
+        
+        });
+        
+        // Fill empty slots visually if needed, but flex/grid handles it.
+    }
+
+    // --- Map & Location Logic ---
+
+function createStandardLayer() {
+    return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19
+    });
+}
+
+function createSatelliteLayer() {
+    return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles © Esri',
+        maxZoom: 19
+    });
+}
+
+function updateMainMapButtons() {
+    document.getElementById('main-standard-btn')?.classList.toggle('active', mainMapMode === 'standard');
+    document.getElementById('main-satellite-btn')?.classList.toggle('active', mainMapMode === 'satellite');
+}
+
+function updateOrderMapButtons() {
+    document.getElementById('order-standard-btn')?.classList.toggle('active', orderMapMode === 'standard');
+    document.getElementById('order-satellite-btn')?.classList.toggle('active', orderMapMode === 'satellite');
+}
+
+function setMainMapMode(mode) {
+    if (!map) return;
+    mainMapMode = mode;
+
+    if (currentMainLayer) {
+        map.removeLayer(currentMainLayer);
+    }
+
+    currentMainLayer = (mode === 'satellite') ? mainSatelliteLayer : mainStandardLayer;
+    currentMainLayer.addTo(map);
+    updateMainMapButtons();
+}
+
+function setOrderMapMode(mode) {
+    if (!orderLocationMap) return;
+    orderMapMode = mode;
+
+    if (currentOrderLayer) {
+        orderLocationMap.removeLayer(currentOrderLayer);
+    }
+
+    currentOrderLayer = (mode === 'satellite') ? orderSatelliteLayer : orderStandardLayer;
+    currentOrderLayer.addTo(orderLocationMap);
+    updateOrderMapButtons();
+}
+
+    function initMap() {
+    const isLocationSet = user.lat != null && user.lng != null;
+
+    map = L.map('map').setView([currentLat, currentLng], 13);
+
+    mainStandardLayer = createStandardLayer();
+    mainSatelliteLayer = createSatelliteLayer();
+    currentMainLayer = mainStandardLayer;
+    currentMainLayer.addTo(map);
+
+    marker = L.marker([currentLat, currentLng], { draggable: false }).addTo(map);
+
+    updateMainMapButtons();
+
+    if (isLocationSet) {
+        document.getElementById('loc-msg').innerText = "Delivery location is set.";
+        document.getElementById('gps-btn').classList.add('hidden');
+    } else {
+        map.on('click', function(e) {
+            marker.setLatLng(e.latlng);
+            tempLat = e.latlng.lat;
+            tempLng = e.latlng.lng;
+            document.getElementById('confirm-loc-btn').classList.remove('hidden');
+        });
+    }
+}
+
+    function detectLocation() {
+        if (!navigator.geolocation) {
+            showModal("Geolocation is not supported by your browser");
+            return;
+        }
+        navigator.geolocation.getCurrentPosition((position) => {
+            const { latitude, longitude } = position.coords;
+            map.setView([latitude, longitude], 15);
+            marker.setLatLng([latitude, longitude]);
+            tempLat = latitude;
+            tempLng = longitude;
+            document.getElementById('confirm-loc-btn').classList.remove('hidden');
+        }, () => {
+            showModal("Unable to retrieve your location");
+        });
+    }
+
+    async function confirmLocation() {
+        if (tempLat && tempLng) {
+            await updateLocation(tempLat, tempLng);
+            document.getElementById('confirm-loc-btn').classList.add('hidden');
+            document.getElementById('gps-btn').classList.add('hidden');
+            document.getElementById('loc-msg').innerText = "Delivery location saved.";
+            map.off('click');
+        }
+    }
+
+    async function updateLocation(lat, lng) {
+        currentLat = lat;
+        currentLng = lng;
+        // Save to backend logic
+        await fetch('/user/location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: user.id, lat, lng })
+        });
+        user.lat = lat;
+        user.lng = lng;
+        // Update display
+        document.getElementById('lbl-lat').innerText = lat;
+        document.getElementById('lbl-lng').innerText = lng;
+    }
+
+    // --- Modal Logic ---
+    function showModal(msg) {
+        const orderModal = document.getElementById('order-location-modal');
+        if (orderModal && !orderModal.classList.contains('hidden')) {
+            closeOrderLocationModal();
+        }
+
+        document.getElementById('modal-msg').innerText = msg;
+        document.getElementById('custom-modal').classList.remove('hidden');
+
+        setTimeout(() => {
+            closeModal();
+        }, 3000);
+    }
+    function closeModal() {
+        document.getElementById('custom-modal').classList.add('hidden');
+    }
+
+    async function loadOrderForm() {
+        const res = await fetch('/config');
+        globalConfig = await res.json();
+        const form = document.getElementById('order-form');
+        form.innerHTML = '';
+
+        globalConfig.items.forEach(item => {
+            if (item.available) {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'order-item';
+                itemDiv.innerHTML = `
+                    <label for="item-${item.id}">${item.name} (Price: ${item.price})</label>
+                    <input type="number" id="item-${item.id}" data-item-id="${item.id}" min="0" value="0" placeholder="Qty" oninput="calculateTotal()">
+                `;
+                form.appendChild(itemDiv);
+            }
+        });
+    }
+
+    function calculateTotal() {
+        let total = 0;
+        if (globalConfig && globalConfig.items) {
+            globalConfig.items.forEach(item => {
+                if (item.available) {
+                    const inp = document.getElementById(`item-${item.id}`);
+                    const qty = inp ? (parseInt(inp.value) || 0) : 0;
+                    total += qty * item.price;
+                }
+            });
+        }
+        document.getElementById('total-price-display').innerText = `Total: ₹${total}`;
+    }
+
+async function loadOrders() {
+    const res = await fetch(`/orders/${user.id}`);
+    const orders = await res.json();
+
+    const tbody = document.querySelector('#history-table tbody');
+    tbody.innerHTML = '';
+
+    if (!orders || orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5">No orders placed yet.</td></tr>';
+
+        const btn = document.getElementById('quick-order-btn');
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('disabled');
+            btn.innerText = "Order Water (1 Load - 20L Jar)";
+        }
+        return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    let todayOrder = false;
+    let expandedRow = null;
+
+    orders.forEach(o => {
+        if (o.created_at === today) {
+            todayOrder = true;
+        }
+    });
+
+    const btn = document.getElementById('quick-order-btn');
+    if (btn) {
+        if (todayOrder) {
+            btn.disabled = true;
+            btn.classList.add('disabled');
+            btn.innerText = "today's order is already placed";
+        } else {
+            btn.disabled = false;
+            btn.classList.remove('disabled');
+            btn.innerText = "Order Water (1 Load - 20L Jar)";
+        }
+    }   
+    console.log(orders);
+    
+
+    orders.forEach(o => {
+        let itemsStr = 'N/A';
+
+        if (o.item && Array.isArray(o.item)) {
+            thisIs2 = false;
+            
+            // Group items into lines of 2
+            let itemsArray = o.item.map(item => `${item.quantity}-${item.id}`);
+            let formattedLines = [];
+            
+            for (let i = 0; i < itemsArray.length; i += 2) {
+                // Take 2 items and join them with a comma
+                formattedLines.push(itemsArray.slice(i, i + 2).join(', '));
+            }
+
+            // Join the lines with a <br> tag for the HTML display
+            itemsStr = formattedLines.join(',<br>'); 
+
+        } else if (o.load) {
+            itemsStr = `${o.load}x Load (Legacy)`;
+        }
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+
+        // Pending
+        // Active
+        // Delivered
+        // Cancelled
+        const statusStyles = {
+            'Pending':   { bg: '#fff3cd', text: '#856404' }, // Yellow
+            'Active':    { bg: '#cce5ff', text: '#004085' }, // Blue
+            'Delivered': { bg: '#d4edda', text: '#155724' }, // Green
+            'Cancelled': { bg: '#f8d7da', text: '#721c24' }, // Red
+            'default':   { bg: '#e2e3e5', text: '#383d41' }, // Grey
+            'Paid':      { bg: '#00803E', text: '#000000' }, // Green
+            'Unpaid':    { bg: '#C94B22', text: 'white' }, // Red
+        };
+
+        const style = statusStyles[o.status] || statusStyles['default'];
+        const style2 = statusStyles[o.paymentstatus] || statusStyles['default'];
+
+        tr.innerHTML = `
+            <td>${o.created_at || '-'}</td>
+            <td>${itemsStr}</td>
+            <td>
+                <span style="padding: 3px 8px; background-color: ${style.bg}; color: ${style.text}; border-radius: 4px; font-size: 0.9em;">
+                    ${o.status || '-------'}
+                </span>
+            </td>
+            <td>
+                <span style="padding: 3px 8px; background: ${style2.bg}; color: ${style2.text}; border-radius: 4px; font-size: 0.9em;">
+                    ${o.paymentstatus || '-------'}
+                </span>
+            </td>
+            <td onclick="event.stopPropagation()">
+                ${o.status === 'Pending' ? `
+                    <button
+                        style="background: #ffc107; color: #000; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-right: 5px;"
+                        onclick='openEditModal(${JSON.stringify(o)})'>
+                        Edit
+                    </button>
+                ` : ''}
+
+                ${(o.status === 'Pending' || o.status === 'Active') ? `
+                    <button
+                        style="background: #17a2b8; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-right: 5px;"
+                        onclick='updateOrderLocation(${o.id}, user, ${JSON.stringify(o.location || null)})'>
+                        Update Loc
+                    </button>
+                    <button class="cancel-btn" onclick="cancelOrder(${o.id})">Cancel</button>
+                ` : `<p style="margin:0;">can't do anything</p>`}
+            </td>
+        `;
+
+        const detailTr = document.createElement('tr');
+        detailTr.style.display = 'none';
+
+        let fullItemsHtml = '<p style="margin:5px 0;">No item details</p>';
+
+        if (o.item && Array.isArray(o.item) && o.item.length > 0) {
+            fullItemsHtml = `
+                <table style="background-color: #1A1111; width:100%; border-collapse: collapse; margin: 8px 0; font-size: 14px;">
+                    <thead>
+                        <tr style="background-color: #4F3333; text-align: left;">
+                            <th style="border: 1px solid #ddd; padding: 8px;">Item ID</th>
+                            <th style="border: 1px solid #ddd; padding: 8px;">Quantity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${o.item.map(sitem => `
+                            <tr>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${sitem.id}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${sitem.quantity}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        let locationHtml = '<p style="margin:5px 0;">Location: Not set</p>';
+        if (o.location && o.location.lat != null && o.location.lng != null) {
+            locationHtml = `
+                <p style="margin:5px 0;"><strong>Location:</strong></p>
+                <p style="margin:5px 0;">Lat: ${o.location.lat}</p>
+                <p style="margin:5px 0;">Lng: ${o.location.lng}</p>
+            `;
+        }
+
+        detailTr.innerHTML = `
+            <td colspan="5" class="order-detail-td" style="border-bottom:1px solid #ddd;">
+                <div>
+                    <p style="margin:5px 0;"><strong>Order ID:</strong> ${o.id}</p>
+                    <p style="margin:5px 0;"><strong>Date:</strong> ${o.created_at || '-'}</p>
+                    <p style="margin:5px 0;"><strong>Status:</strong> ${o.status || '-------'}</p>
+                    <p style="margin:5px 0;"><strong>Payment:</strong> ${o.paymentstatus || '-------'}</p>
+                    <p style="margin:5px 0;"><strong>Total:</strong> ₹${o.totalamount || 'XXXX'}</p>
+                    <p style="margin:5px 0;"><strong>Paid Amount:</strong> ₹${o.paidamount || 'XXXX'}</p>
+                    <p style="margin:5px 0;"><strong>Items:</strong></p>
+                    ${fullItemsHtml}
+                    ${locationHtml}
+                </div>
+            </td>
+        `;
+
+        tr.onclick = function(e) {
+            if (e.target.tagName === 'BUTTON') return;
+
+            if (expandedRow && expandedRow !== detailTr) {
+                expandedRow.style.display = 'none';
+            }
+
+            if (detailTr.style.display === 'none') {
+                detailTr.style.display = 'table-row';
+                expandedRow = detailTr;
+            } else {
+                detailTr.style.display = 'none';
+                expandedRow = null;
+            }
+        };
+
+        tbody.appendChild(tr);
+        tbody.appendChild(detailTr);
+    });
+}
+
+    // --- Edit Order Logic ---
+    function openEditModal(order) {
+        currentEditingOrderId = order.id;
+        const form = document.getElementById('edit-order-form');
+        form.innerHTML = '';
+
+        if (!globalConfig) return;
+
+        // Map existing items for easy lookup
+        const existingItems = {};
+        if (order.items && Array.isArray(order.items)) {
+            order.items.forEach(i => existingItems[i.id] = i.quantity);
+        }
+
+        globalConfig.items.forEach(item => {
+            if (item.available) {
+                const qty = existingItems[item.id] || 0;
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'order-item';
+                itemDiv.innerHTML = `
+                    <label>${item.name}</label>
+                    <input type="number" class="edit-qty-input" data-item-id="${item.id}" min="0" value="${qty}">
+                `;
+                form.appendChild(itemDiv);
+            }
+        });
+
+        document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+        document.getElementById('edit-modal').classList.add('hidden');
+        currentEditingOrderId = null;
+    }
+
+    async function saveEditedOrder() {
+        const inputs = document.querySelectorAll('.edit-qty-input');
+        const newItems = [];
+        
+        inputs.forEach(input => {
+            const q = parseInt(input.value, 10);
+            if (q > 0) {
+                newItems.push({
+                    id: input.dataset.itemId,
+                    quantity: q
+                });
+            }
+        });
+
+        if (newItems.length === 0) {
+            alert("Order must have at least one item.");
+            return;
+        }
+
+        const res = await fetch(`/order/${currentEditingOrderId}/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: newItems })
+        });
+
+        if (res.ok) {
+            showModal("Order Updated!");
+            closeEditModal();
+            loadOrders();
+        } else {
+            showModal("Failed to update order.");
+        }
+    }
+
+    async function placeOrder() {
+        const orderItems = [];
+        const inputs = document.querySelectorAll('#order-form input');
+        inputs.forEach(input => {
+            const quantity = parseInt(input.value, 10);
+            if (quantity > 0) {
+                orderItems.push({
+                    id: input.dataset.itemId,
+                    quantity: quantity
+                });
+            }
+        });
+
+        if (orderItems.length === 0) {
+            showModal("Please select a quantity for at least one item.");
+            return;
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        const res = await fetch('/order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: user.id,
+                items: orderItems,
+                created_at: today,
+                location: { lat: currentLat, lng: currentLng }
+            })
+        });
+
+        if (res.ok) {
+            showModal("Order Placed Successfully!");
+            // Clear inputs
+            document.querySelectorAll('#order-form input').forEach(i => i.value = 0);
+            calculateTotal();
+            loadOrderForm(); // Reset form
+            loadOrders(); // Refresh list and button state
+        } else {
+            showModal("Failed to place order.");
+        }
+    }
+
+    async function placeQuickOrder() {
+        const today = new Date().toISOString().split('T')[0];
+        const res = await fetch('/order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: user.id,
+                items: [{ id: '20l', quantity: 1 }], // Hardcoded "1 Load"
+                created_at: today,
+                location: { lat: currentLat, lng: currentLng }
+            })
+        });
+
+        if (res.ok) {
+            showModal("Quick Order Placed Successfully!");
+            loadOrders(); // Refresh list and button state
+        } else {
+            showModal("Failed to place quick order.");
+        }
+    }
+
+    async function cancelOrder(orderId) {
+        if (!confirm("Are you sure you want to cancel this order?")) {
+            return;
+        }
+        const res = await fetch(`/order/${orderId}/cancel`, { method: 'POST' });
+        if (res.ok) {
+            showModal("Order cancelled.");
+            loadOrders();
+        } else {
+            showModal("Failed to cancel order.");
+        }
+    }
+let orderLocationMap = null;
+let orderLocationMarker = null;
+
+function closeOrderLocationModal() {
+    document.getElementById("order-location-modal").classList.add("hidden");
+
+    if (orderLocationMap) {
+        orderLocationMap.remove();
+        orderLocationMap = null;
+    }
+
+    orderLocationMarker = null;
+    document.getElementById("order-location-changer").innerHTML = "";
+}
+
+async function updateOrderLocation(orderId, user,locationfl) {
+    const modal = document.getElementById("order-location-modal");
+    const mainDiv = document.getElementById("order-location-changer");
+
+    modal.classList.remove("hidden");
+
+    mainDiv.innerHTML = `
+        <div class="map-mode-bar">
+            <button id="order-standard-btn" class="map-mode-btn active" onclick="setOrderMapMode('standard')">Standard</button>
+            <button id="order-satellite-btn" class="map-mode-btn" onclick="setOrderMapMode('satellite')">Satellite</button>
+        </div>
+        <div id="order-location-map"></div>
+        <button id="save-order-location-btn" class="big-btn" style="margin-top: 10px; background:#28a745;">
+            Set Location
+        </button>
+    `;
+    let orderLat = (user && user.lat != null) ? user.lat : currentLat;
+    let orderLng = (user && user.lng != null) ? user.lng : currentLng;
+
+    if (locationfl && locationfl.lat != null && locationfl.lng != null) {
+        orderLat = locationfl.lat;
+        orderLng = locationfl.lng;
+    }
+
+
+    if (orderLocationMap) {
+        orderLocationMap.remove();
+        orderLocationMap = null;
+    }
+
+    orderLocationMap = L.map("order-location-map").setView([orderLat, orderLng], 13);
+
+    orderStandardLayer = createStandardLayer();
+    orderSatelliteLayer = createSatelliteLayer();
+    currentOrderLayer = (orderMapMode === 'satellite') ? orderSatelliteLayer : orderStandardLayer;
+    currentOrderLayer.addTo(orderLocationMap);
+
+    updateOrderMapButtons();
+
+    orderLocationMarker = L.marker([orderLat, orderLng], {
+        draggable: true
+    }).addTo(orderLocationMap);
+
+    let selectedLat = orderLat;
+    let selectedLng = orderLng;
+
+    orderLocationMarker.on("dragend", function () {
+        const pos = orderLocationMarker.getLatLng();
+        selectedLat = pos.lat;
+        selectedLng = pos.lng;
+    });
+
+    orderLocationMap.on("click", function (e) {
+        selectedLat = e.latlng.lat;
+        selectedLng = e.latlng.lng;
+        orderLocationMarker.setLatLng([selectedLat, selectedLng]);
+    });
+
+    document.getElementById("save-order-location-btn").onclick = async function () {
+        const res = await fetch(`/order/${orderId}/location`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                lat: selectedLat,
+                lng: selectedLng
+            })
+        });
+
+        if (res.ok) {
+            closeOrderLocationModal();
+            showModal("Order location updated!");
+            loadOrders();
+        } else {
+            showModal("Failed to update location.");
+        }
+    };
+
+    setTimeout(() => {
+        if (orderLocationMap) {
+            orderLocationMap.invalidateSize();
+        }
+    }, 300);
+}
+
+
+async function uploadProfilePic() {
+    const input = document.getElementById('profile-pic-input');
+
+    input.value = '';
+    input.click();
+
+    input.onchange = async () => {
+        if (input.files.length === 0) {
+            showModal("Please select a file to upload.");
+            return;
+        }
+
+        const file = input.files[0];
+        const formData = new FormData();
+        formData.append('profile_pic', file);
+
+        const res = await fetch(`/upload/profile-picture/${user.id}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': JSON.parse(localStorage.getItem('user')).token
+            },
+            body: formData
+        });
+
+        if (res.ok) {
+            showModal("Profile picture updated!");
+
+            await getAndStoreUser();
+
+            const newUrl = (user.profile_pic || "https://imgs.search.brave.com/RDlr00DIZWKKhPu4ymE1K_IzmblJm8CbiuCSzm-xnQ4/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly90NC5m/dGNkbi5uZXQvanBn/LzAxLzA3LzQzLzQ1/LzM2MF9GXzEwNzQz/NDUxMV9pYXJGMno4/OGM2RHM2QWxndHdv/dEhTQWt0V0NkWU9u/Ny5qcGc") + `?t=${Date.now()}`;
+
+            document.getElementById('profile-img').src = newUrl;
+            document.getElementById('nav-profile-pic').src = newUrl;
+
+        } else {
+            const errorData = await res.json();
+            showModal(errorData.error || "Failed to upload picture.");
+        }
+    };
+}
+    async function uploadRefImg() {
+        const input = document.getElementById('ref-img-input');
+
+        input.value = ''; // clear input
+
+        input.click();
+
+        // wait for until file selection
+        input.onchange = async () => {
+        if (input.files.length === 0) return showModal("Select a file.");
+
+        const formData = new FormData();
+        formData.append('ref_img', input.files[0]);
+
+        const res = await fetch(`/upload/ref-image/${user.id}`, {
+            method: 'POST',
+            headers: { 'Authorization': JSON.parse(localStorage.getItem('user')).token },
+            body: formData
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            if (!user.ref_img) user.ref_img = [];
+            user.ref_img.push(data.filepath);
+            input.value = ''; // clear input
+        
+            getAndStoreUser();
+            setTimeout(() => {
+                renderRefImages();
+            }, 3000);
+        } else {
+            const err = await res.json();
+            showModal(err.error || "Upload failed");
+        }
+    }
+}
+
+    async function deleteRefImg(filepath) {
+        if(!confirm("Remove this reference image?")) return;
+        const res = await fetch(`/delete/ref-image/${user.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': JSON.parse(localStorage.getItem('user')).token },
+            body: JSON.stringify({ filepath })
+        });
+        if (res.ok) {
+            user.ref_img = user.refrence_Img.filter(p => p !== filepath);
+        
+            getAndStoreUser();
+            setTimeout(() => {
+                renderRefImages();
+            }, 3000);
+
+        }
+    }
+    async function getAndStoreUser(){ 
+        try {
+            const res = await fetch('/user/me', {
+                headers: { 'Authorization': JSON.parse(localStorage.getItem('user')).token }
+            });
+
+            if (!res.ok) {
+                logout();
+                return;
+            }
+            user = await res.json();
+        }catch(err){
+            console.log("error getting user")
+            console.error(err);
+        }
+    }
+    // Start App
+    checkAuth();
+</script>
+
+</body>
+
+</html>

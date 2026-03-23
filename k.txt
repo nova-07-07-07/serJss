@@ -1,0 +1,8 @@
+Pending
+Active
+Delivered
+Cancelled
+
+Unpaid
+Paid
+
